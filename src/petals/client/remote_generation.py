@@ -21,7 +21,7 @@ class RemotePastKeyValues(Cache):
     """only keeps the number of seen tokens. pretends to be a legit cache"""
 
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(layers=[])
         self._seen_tokens = 0
         self.hypo_ids: Optional[torch.LongTensor] = None
 
