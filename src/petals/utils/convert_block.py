@@ -70,6 +70,9 @@ def convert_block(
             )
             add_adapter_to_block(block, block_index, adapter_name, adapter_config, adapter_state_dict)
 
+    if freeze:
+        block.requires_grad_(False)
+
     torch_compile = kwargs.get("torch_compile", False)
     if torch_compile:
         try:
@@ -111,6 +114,7 @@ class CPUAndMPSLinear8bit(nn.Module):
         quantized.scale.copy_(scale)
         if linear_layer.bias is not None:
             quantized.bias.data.copy_(linear_layer.bias.data)
+            quantized.bias.requires_grad = False
         return quantized
 
 
@@ -160,6 +164,7 @@ class CPUAndMPSLinear4bit(nn.Module):
         quantized.scale.copy_(scale)
         if linear_layer.bias is not None:
             quantized.bias.data.copy_(linear_layer.bias.data)
+            quantized.bias.requires_grad = False
         return quantized
 
 
