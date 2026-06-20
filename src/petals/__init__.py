@@ -33,3 +33,13 @@ def _override_bfloat16_mode_default():
 
 _initialize_logs()
 _override_bfloat16_mode_default()
+
+import hivemind.utils.mpfuture
+original_next = hivemind.utils.mpfuture.SharedBytes.next
+
+def _patched_next(*args, **kwargs):
+    import torch
+    with torch.device("cpu"):
+        return original_next(*args, **kwargs)
+
+hivemind.utils.mpfuture.SharedBytes.next = _patched_next

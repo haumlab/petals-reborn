@@ -28,7 +28,8 @@ class LMHead(nn.Module):
             self.weight = nn.Parameter(torch.zeros(config.vocab_size, config.hidden_size))
             self.weight.requires_grad = False
         else:
-            self.weight = None  # Will be set to get_input_embeddings().weight during loading the model
+            self.weight = nn.Parameter(torch.zeros(1))
+            self.weight.requires_grad = False
         self.bias = None
         self.in_features = config.hidden_size  # Similar to nn.Linear attributes
         self.out_features = config.vocab_size
