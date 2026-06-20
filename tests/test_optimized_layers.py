@@ -184,11 +184,20 @@ class UnoptimizedWrappedLlamaBlock(LlamaDecoderLayer):
         return (key_states, value_states)
 
 
-@pytest.mark.parametrize("device", ["cpu", "cuda:0"])
+_devices = ["cpu"]
+if torch.cuda.is_available():
+    _devices.append("cuda:0")
+if torch.backends.mps.is_available():
+    _devices.append("mps:0")
+
+
+@pytest.mark.parametrize("device", _devices)
 @pytest.mark.forked
 def test_optimized_block(device):
     if device == "cuda:0" and not torch.cuda.is_available():
         pytest.skip("CUDA tests can be run only in CUDA-enabled setups")
+    if device == "mps:0" and not torch.backends.mps.is_available():
+        pytest.skip("MPS tests can be run only in MPS-enabled setups")
 
     config = AutoDistributedConfig.from_pretrained(MODEL_NAME)
 

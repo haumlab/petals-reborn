@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 from hivemind import PeerID, get_logger
@@ -20,9 +20,17 @@ def compute_throughputs(spans: Dict[PeerID, RemoteSpanInfo], *, total_blocks: in
     return throughputs
 
 
-def _choose_best_start(throughputs: np.ndarray, num_blocks: int) -> int:
-    options = ((sorted(throughputs[i : i + num_blocks]), i) for i in range(0, len(throughputs) - num_blocks + 1))
-    return min(options)[-1]
+def _choose_best_start(throughputs: np.ndarray, num_blocks: int, current_start: Optional[int] = None) -> int:
+    import random
+    options = []
+    for i in range(0, len(throughputs) - num_blocks + 1):
+        throughput_slice = sorted(throughputs[i : i + num_blocks])
+        options.append((throughput_slice, i))
+    min_profile = min(options, key=lambda x: x[0])[0]
+    best_starts = [i for profile, i in options if profile == min_profile]
+    if current_start is not None and current_start in best_starts:
+        return current_start
+    return random.choice(best_starts)
 
 
 def choose_best_blocks(num_blocks: int, module_infos: List[RemoteModuleInfo]) -> List[int]:
@@ -59,7 +67,7 @@ def should_choose_other_blocks(
     if initial_throughput > eps and throughputs.min() <= 0:
         return False  # Switching blocks would make the swarm disjoint
 
-    new_start = _choose_best_start(throughputs, local_span.length)
+    new_start = _choose_best_start(throughputs, local_span.length, current_start=local_span.start)
     if local_span.start == new_start:
         return False  # This server is on its best place already
 
@@ -77,7 +85,7 @@ def should_choose_other_blocks(
             span = spans[peer_id]
             throughputs[span.start : span.end] -= span.throughput * (1 + eps)
 
-            new_start = _choose_best_start(throughputs, span.length)
+            new_start = _choose_best_start(throughputs, span.length, current_start=span.start)
 
             throughputs[span.start : span.end] += span.throughput * eps
             if span.start != new_start:

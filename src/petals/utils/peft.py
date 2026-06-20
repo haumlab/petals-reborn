@@ -15,7 +15,29 @@ from peft.tuners import lora
 from peft.utils import CONFIG_NAME, SAFETENSORS_WEIGHTS_NAME
 from safetensors import safe_open
 from safetensors.torch import load_file
-from transformers.utils import get_file_from_repo
+from huggingface_hub import hf_hub_download
+
+
+def get_file_from_repo(
+    repo_id,
+    filename,
+    *,
+    use_auth_token=None,
+    cache_dir=None,
+    local_files_only=False,
+    **kwargs,
+):
+    try:
+        return hf_hub_download(
+            repo_id=repo_id,
+            filename=filename,
+            token=use_auth_token,
+            cache_dir=cache_dir,
+            local_files_only=local_files_only,
+            **kwargs,
+        )
+    except Exception:
+        return None
 
 from petals.server.block_utils import get_model_block, resolve_block_dtype
 from petals.utils.convert_block import QuantType

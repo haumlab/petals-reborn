@@ -163,6 +163,8 @@ def main():
 
     parser.add_argument("--adapters", nargs='*', default=(),
                         help="List of pre-loaded LoRA adapters that can be used for inference or training")
+    parser.add_argument("--torch_compile", action="store_true",
+                        help="Compile the transformer block using PyTorch 2.0+ torch.compile() for faster execution.")
 
     # fmt:on
     args = vars(parser.parse_args())

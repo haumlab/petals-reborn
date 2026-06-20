@@ -379,8 +379,14 @@ class RemoteSequenceManager:
             last_servers = [span.peer_id for span in self.state.sequence_info.spans_containing_block[-1]]
 
         pinged_servers = set(sample_up_to(first_servers, self.config.max_pinged))
-        pinged_servers = set(sample_up_to(middle_servers, self.config.max_pinged))
+        pinged_servers |= set(sample_up_to(middle_servers, self.config.max_pinged))
         pinged_servers |= set(sample_up_to(last_servers, self.config.max_pinged))
+        try:
+            best_sequence = self._make_sequence_with_min_latency(0, len(self), cache_tokens_needed=None)
+            for span in best_sequence:
+                pinged_servers.add(span.peer_id)
+        except Exception:
+            pass
         self.ping_aggregator.ping(list(pinged_servers), wait_timeout=self.config.ping_timeout)
 
         self.ready.set()

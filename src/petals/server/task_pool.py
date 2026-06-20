@@ -93,19 +93,26 @@ class PrioritizedTaskPool(threading.Thread):
         self.submitted_tasks.put(None)  # Shuts down self.run()
 
     def submit_task(self, *args: Any, priority: float = 0.0) -> MPFuture:
-        """Add task to this pool's queue, return Future for its output"""
         future = MPFuture()
-        # Remove shmem from MPFuture. This disables the .cancel() feature but
-        # saves the server from "could not unlink the shared memory file" crashes during rebalancing
         future._shared_state_code = torch.tensor([ALL_STATES.index(PENDING)], dtype=torch.uint8)
 
-        task = Task(priority, time.monotonic(), future, args)
+        pinned_args = []
+        for arg in args:
+            if isinstance(arg, torch.Tensor) and not arg.is_cuda:
+                try:
+                    if not arg.is_pinned():
+                        arg = arg.pin_memory()
+                except Exception:
+                    pass
+            pinned_args.append(arg)
+
+        task = Task(priority, time.monotonic(), future, pinned_args)
         if self.get_task_size(task) > self.max_batch_size:
             exc = ValueError(f"Task size greater than max_batch_size ({self.max_batch_size}), it can't be processed")
             task.future.set_exception(exc)
         else:
             self.submitted_tasks.put(task)
-            self.batch_sender.send(None)  # use this pipe to count the number of unfinished batches
+            self.batch_sender.send(None)
             if (task.priority, task.time_submitted) < self.priority:
                 self.priority = (task.priority, task.time_submitted)
         return task.future

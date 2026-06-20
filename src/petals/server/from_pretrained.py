@@ -20,10 +20,31 @@ from hivemind.utils.logging import get_logger
 from huggingface_hub import get_hf_file_metadata, hf_hub_url
 from huggingface_hub.utils import EntryNotFoundError
 from transformers import PretrainedConfig, PreTrainedModel
-from transformers.utils import get_file_from_repo
+from huggingface_hub import hf_hub_download
+
+
+def get_file_from_repo(
+    repo_id,
+    filename,
+    *,
+    use_auth_token=None,
+    cache_dir=None,
+    local_files_only=False,
+    **kwargs,
+):
+    try:
+        return hf_hub_download(
+            repo_id=repo_id,
+            filename=filename,
+            token=use_auth_token,
+            cache_dir=cache_dir,
+            local_files_only=local_files_only,
+            **kwargs,
+        )
+    except Exception:
+        return None
 
 from petals.constants import DTYPE_MAP
-from petals.models.mixtral import WrappedMixtralBlock
 from petals.server.block_utils import get_model_block, resolve_block_dtype
 from petals.utils.auto_config import AutoDistributedConfig
 from petals.utils.disk_cache import DEFAULT_CACHE_DIR, allow_cache_reads, allow_cache_writes, free_disk_space_for

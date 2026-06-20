@@ -4,7 +4,6 @@ import torch
 from accelerate import init_empty_weights
 from transformers import PretrainedConfig, PreTrainedModel
 
-from petals.models.mixtral.block import WrappedMixtralBlock
 from petals.utils.convert_block import QuantType
 from petals.utils.misc import get_size_in_bytes
 
@@ -54,12 +53,11 @@ def get_block_size(
 
 
 def get_model_block(config, layer_idx: int = 0):
-    """
-    The function to create a model block based on the block class
-    kwargs argument **only** is necessary for specific classes, like Mixtral.
-    They will not be passed to other block constructors.
-    """
-    if config.block_class == WrappedMixtralBlock:
+    import inspect
+    from transformers import PreTrainedModel
+    sig = inspect.signature(config.block_class)
+    if hasattr(PreTrainedModel, "_autoset_attn_implementation"):
         config = PreTrainedModel._autoset_attn_implementation(config)
+    if "layer_idx" in sig.parameters:
         return config.block_class(config, layer_idx)
     return config.block_class(config)

@@ -1,22 +1,16 @@
 from typing import Optional, Tuple
 
 import torch
-from transformers import MixtralConfig
-from transformers.modeling_attn_mask_utils import (
-    _prepare_4d_causal_attention_mask,
-    _prepare_4d_causal_attention_mask_for_sdpa,
-)
-from transformers.models.mixtral.modeling_mixtral import MixtralDecoderLayer
+from transformers import MistralConfig
+from transformers.modeling_attn_mask_utils import _prepare_4d_causal_attention_mask
+from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 
 from petals.utils.cache import SingleLayerCache
 
 
-class WrappedMixtralBlock(MixtralDecoderLayer):
-    def __init__(self, config: MixtralConfig, layer_idx: int):
+class WrappedMistralBlock(MistralDecoderLayer):
+    def __init__(self, config: MistralConfig, layer_idx: int):
         super().__init__(config, layer_idx)
-
-        self._attn_implementation = config._attn_implementation
-        self.sliding_window = config.sliding_window
         self.layer_idx = layer_idx
 
     def forward(
@@ -29,10 +23,8 @@ class WrappedMixtralBlock(MixtralDecoderLayer):
         **kwargs
     ):
         batch_size, seq_length, _ = hidden_states.shape
-
         seq_length_with_past = seq_length
         past_key_values_length = 0
-
         past_key_value = layer_past
 
         if past_key_value is not None:
@@ -41,23 +33,18 @@ class WrappedMixtralBlock(MixtralDecoderLayer):
             _past_key_value = self._reorder_cache_from_bloom(past_key_value, batch_size, past_key_values_length)
             past_key_value = SingleLayerCache(self.layer_idx, _past_key_value[0], _past_key_value[1], past_key_values_length)
 
-        if self._attn_implementation == "flash_attention_2":
-            attention_mask = attention_mask if (attention_mask is not None and 0 in attention_mask) else None
-        elif self._attn_implementation == "sdpa":
-            attention_mask = _prepare_4d_causal_attention_mask_for_sdpa(
-                attention_mask,
-                (batch_size, seq_length),
-                hidden_states,
-                past_key_values_length,
+        if attention_mask is None:
+            attention_mask = torch.ones(
+                (batch_size, seq_length_with_past), dtype=torch.bool, device=hidden_states.device
             )
-        else:
-            attention_mask = _prepare_4d_causal_attention_mask(
-                attention_mask,
-                (batch_size, seq_length),
-                hidden_states,
-                past_key_values_length,
-                sliding_window=self.sliding_window,
-            )
+
+        attention_mask = _prepare_4d_causal_attention_mask(
+            attention_mask,
+            (batch_size, seq_length),
+            hidden_states,
+            past_key_values_length,
+            sliding_window=self.config.sliding_window,
+        )
 
         position_ids = torch.arange(
             past_key_values_length, seq_length + past_key_values_length, dtype=torch.long, device=hidden_states.device

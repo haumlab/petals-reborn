@@ -92,6 +92,7 @@ class Server:
         use_relay: bool = True,
         use_auto_relay: bool = True,
         adapters: Sequence[str] = (),
+        torch_compile: bool = False,
         **kwargs,
     ):
         """Create a server with one or more bloom blocks. See run_server.py for documentation."""
@@ -104,6 +105,7 @@ class Server:
         self.stats_report_interval, self.update_period = stats_report_interval, update_period
         self.prefetch_batches, self.sender_threads = prefetch_batches, sender_threads
         self.revision, self.token = revision, token
+        self.torch_compile = torch_compile
 
         if custom_module_path is not None:
             add_custom_models_from_file(custom_module_path)
@@ -165,7 +167,7 @@ class Server:
             else:
                 device = "cpu"
         device = torch.device(device)
-        if device.type == "cuda" and device.index is None:
+        if device.type in ("cuda", "mps") and device.index is None:
             device = torch.device(device.type, index=0)
         self.device = device
 
@@ -293,6 +295,8 @@ class Server:
                 )
         elif self.device.type == "cuda":
             total_memory = torch.cuda.get_device_properties(self.device).total_memory
+        elif self.device.type == "mps":
+            total_memory = int(psutil.virtual_memory().total * 0.75)
         else:
             total_memory = psutil.virtual_memory().total
 
@@ -361,6 +365,7 @@ class Server:
                 quant_type=self.quant_type,
                 tensor_parallel_devices=self.tensor_parallel_devices,
                 should_validate_reachability=self.should_validate_reachability,
+                torch_compile=self.torch_compile,
                 start=True,
             )
             try:
@@ -460,6 +465,7 @@ class ModuleContainer(threading.Thread):
         quant_type: QuantType,
         tensor_parallel_devices: Sequence[torch.device],
         should_validate_reachability: bool,
+        torch_compile: bool = False,
         **kwargs,
     ) -> ModuleContainer:
         module_uids = [f"{dht_prefix}{UID_DELIMITER}{block_index}" for block_index in block_indices]
@@ -507,6 +513,7 @@ class ModuleContainer(threading.Thread):
                     token=token,
                     cache_dir=cache_dir,
                     max_disk_space=max_disk_space,
+                    torch_compile=torch_compile,
                 )
                 blocks[module_uid] = TransformerBackend(
                     module_uid,
